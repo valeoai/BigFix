@@ -1,0 +1,80 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bigfix"
+version = "1.0.0"
+description = "BIGFix: Bidirectional Image Generation with Token Fixing"
+readme = "README.md"
+license = { file = "LICENSE.txt" }
+requires-python = ">=3.9"
+authors = [
+    { name = "Victor Besnier" }
+]
+keywords = ["image-generation", "masked-generative-transformer", "maskgit", "text-to-image", "pytorch"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# Everything imported at module level by bigfix/main.py / bigfix/txt2img_pipeline.py (the trainers pull in the
+# dataloader and the metrics, so they are needed even for inference).
+dependencies = [
+    "torch>=2.1",
+    "torchvision",
+    "numpy",
+    "pillow",
+    "pyyaml",
+    "opencv-python",
+    "einops",
+    "tqdm",
+    "tensorboard",
+    "matplotlib",
+    "pandas",
+    "scipy",
+    "scikit-learn",
+    "webdataset",
+    # text encoder (google/flan-t5-xl) and Hugging Face checkpoints
+    "transformers>=4.52",
+    "sentencepiece",
+    "huggingface_hub",
+    # FID / IS / CLIP-score evaluation
+    "torchmetrics[multimodal]",
+    "torch-fidelity",
+    "clean-fid",
+    "thop",
+]
+
+[project.optional-dependencies]
+# Reward models (bigfix/utils/rewards.py) used by the reward-conditioned text-to-image training
+# (--extra-cond / --compute-reward-on-the-fly) and the RL fine-tuning.
+reward = [
+    "hpsv2==1.2.0",
+    "aesthetic-predictor==0.1.2",
+    "image-reward",
+    "pyiqa",
+    "timm",
+]
+# Data preparation for text-to-image (bigfix/utils/generate_txt.py)
+data = [
+    "datasets",
+    "requests",
+]
+
+[project.urls]
+Homepage = "https://github.com/valeoai/BigFix"
+Repository = "https://github.com/valeoai/BigFix"
+Paper = "https://arxiv.org/abs/2510.12231"
+Weights = "https://huggingface.co/llvictorll/BigFIX"
+
+# Everything lives in the `bigfix` package (`from bigfix.trainer.txt_trainer import MaskGIT`).
+# The YAML configs (bigfix/config/) and the prompt files (bigfix/metrics/) are package data, so
+# they are found from any working directory once installed.
+[tool.setuptools.packages.find]
+include = ["bigfix*"]
+
+[tool.setuptools.package-data]
+bigfix = ["config/*.yaml", "metrics/*.tsv", "utils/*.txt"]

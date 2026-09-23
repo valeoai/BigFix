@@ -1,0 +1,23 @@
+# --- Python / packaging ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# --- Model checkpoints (downloaded from Hugging Face into saved_networks/) ---
+saved_networks/*.pth
+saved_networks/*.pt
+
+# --- Generated outputs ---
+flagged/                      # Gradio
+downstream_decoder/
+
+# --- Internal experiments / scripts, not part of the release ---
+launch/exp/
+grpo*
+bigfix/metrics/parti_prompt.py
+bpe_simple_vocab_16e6.txt.gz
+# --- Hidden files and folders (.vscode, .ipynb_checkpoints, .idea, ...), except this file ---
+.*
+!/.gitignore
