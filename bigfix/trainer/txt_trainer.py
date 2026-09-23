@@ -226,7 +226,13 @@ class MaskGIT(Trainer):
                     ckpt = self.args.vit_folder
 
                 if os.path.isfile(ckpt):
-                    checkpoint = torch.load(ckpt, map_location='cpu', weights_only=False)
+                    # Training checkpoints also hold the optimizer state (~2x the weights, several GB for the
+                    # xlarge model). Memory-mapping the file pages in only the tensors that are actually read
+                    # (the model weights), which keeps inference within the RAM of a free Colab runtime.
+                    try:
+                        checkpoint = torch.load(ckpt, map_location='cpu', weights_only=False, mmap=True)
+                    except RuntimeError:  # legacy (non-zipfile) checkpoints cannot be memory-mapped
+                        checkpoint = torch.load(ckpt, map_location='cpu', weights_only=False)
                     state_dict = checkpoint['model_state_dict']
                     # state_dict.pop("tok_emb.weight", None)
                     # state_dict.pop("pos_emb.weight", None)
@@ -236,6 +242,7 @@ class MaskGIT(Trainer):
                     # Update the current epoch and iteration
                     self.args.iter = checkpoint['iter']
                     self.args.global_epoch = checkpoint['global_epoch']
+                    del checkpoint, state_dict, new_state_dict  # release the mapping of the checkpoint file
 
                     if self.args.is_master:
                         print("Load ckpt from:", ckpt)

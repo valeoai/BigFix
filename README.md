@@ -4,8 +4,7 @@
 [![Hugging Face Model](https://img.shields.io/badge/Hugging%20Face-Model%20Card-orange?logo=huggingface)](https://huggingface.co/llvictorll/BigFIX/tree/main)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/valeoai/BigFix/blob/main/demo_txt2img.ipynb)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.txt)
-[![Paper](https://img.shields.io/badge/arXiv-2510.12231-b31b1b)](https://arxiv.org/abs/2510.12231)
-[![Paper](https://img.shields.io/badge/ICLR-2025-blue)](https://openreview.net/forum?id=RDVrlWAb7K) <img src="statics/its_just_a_frog_cie.png" alt="drawing" width="25"/>
+[![Paper](https://img.shields.io/badge/arXiv-2510.12231-b31b1b)](https://arxiv.org/abs/2510.12231) <img src="statics/its_just_a_frog_cie.png" alt="drawing" width="25"/>
 
 Official PyTorch implementation of:  
 **BIGFix: Bidirectional Image Generation with Token Fixing**  
