@@ -177,8 +177,14 @@ class MaskGITPipeline:
     def __call__(self, prompt: Union[str, List[str]], negative_prompt: Optional[str] = None,
                  num_images_per_prompt: int = 1, num_inference_steps: Optional[int] = None,
                  guidance_scale: Optional[float] = None, seed: Optional[int] = None,
+                 sm_temp_min: Optional[float] = None, sm_temp_max: Optional[float] = None,
+                 top_k: Optional[int] = None, top_p: Optional[float] = None,
+                 scheduler: Optional[str] = None, randomize: Optional[bool] = None,
+                 lin_cfg_warmup: bool = False, start_correction: Optional[int] = None,
                  verbose: bool = False) -> MaskGITOutput:
-        """ Generate image(s) from a text prompt.
+        """ Generate image(s) from a text prompt. Every sampling argument left at None keeps the
+            config's value (`step`, `cfg_w`, `sm_temp_min`, `sm_temp`, `top_k`, `top_p`, `randomize`)
+            or the sampler's own default (`scheduler`, `start_correction`).
            :param
             prompt                -> str | list[str]: the text prompt(s)
             negative_prompt       -> str: optional negative prompt for classifier-free guidance
@@ -189,6 +195,22 @@ class MaskGITPipeline:
             seed                  -> int: sets the global torch seed before sampling for this
                                      call (the underlying sampler draws from the global RNG, so
                                      unlike diffusers this isn't a scoped `torch.Generator`)
+            sm_temp_min           -> float: softmax temperature at the first step. The temperature
+                                     is linearly interpolated from `sm_temp_min` to `sm_temp_max`
+                                     over the steps and *multiplies* the logits (so higher = sharper,
+                                     less random)
+            sm_temp_max           -> float: softmax temperature at the last step
+            top_k                 -> int: keep only the k most likely tokens (-1 disables)
+            top_p                 -> float: nucleus sampling threshold (1.0 disables)
+            scheduler             -> str: how many tokens are revealed per step, one of
+                                     "arccos" (default), "linear", "sqrt", "square", "cos"
+            randomize             -> bool: randomly rotate the Halton order for each image, so
+                                     different samples reveal tokens in a different order
+            lin_cfg_warmup        -> bool: ramp the guidance linearly from 0 to `guidance_scale`
+                                     over the steps instead of using it at full strength throughout
+            start_correction      -> int: during the last `start_correction` steps, every token
+                                     revealed so far is re-sampled (instead of only the new ones),
+                                     which lets the model fix earlier mistakes
             verbose               -> bool: show a progress bar over sampling steps
            :return
             MaskGITOutput(images=[PIL.Image, ...])
@@ -204,13 +226,23 @@ class MaskGITPipeline:
         txt_emb = self._encode_prompt(prompts)
         neg_txt_emb = self._encode_prompt([negative_prompt] * len(prompts)) if negative_prompt else None
 
+        args = self.model.args
+        extra = {}
+        if scheduler is not None:
+            extra["scheduler"] = scheduler
+        if start_correction is not None:
+            extra["start_correction"] = start_correction
+
         sampler = TxtHaltonSampler(
-            sm_temp_min=self.model.args.sm_temp_min, sm_temp_max=self.model.args.sm_temp,
-            temp_pow=1, temp_warmup=self.model.args.temp_warmup,
-            w=self.model.args.cfg_w if guidance_scale is None else guidance_scale,
-            step=self.model.args.step if num_inference_steps is None else num_inference_steps,
-            randomize=self.model.args.randomize, top_k=self.model.args.top_k,
-            top_p=self.model.args.top_p,
+            sm_temp_min=args.sm_temp_min if sm_temp_min is None else sm_temp_min,
+            sm_temp_max=args.sm_temp if sm_temp_max is None else sm_temp_max,
+            temp_pow=1, temp_warmup=args.temp_warmup,
+            w=args.cfg_w if guidance_scale is None else guidance_scale,
+            step=args.step if num_inference_steps is None else num_inference_steps,
+            randomize=args.randomize if randomize is None else randomize,
+            top_k=args.top_k if top_k is None else top_k,
+            top_p=args.top_p if top_p is None else top_p,
+            lin_cfg_warmup=lin_cfg_warmup, **extra,
         )
 
         try:
