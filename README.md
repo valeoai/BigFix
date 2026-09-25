@@ -12,11 +12,11 @@ Official PyTorch implementation of:
 arXiv:2510.12231
 
 TL;DR: Parallel (masked-token) generation is fast but, unlike autoregressive decoding, it can't revisit a token
-once committed -- so early sampling mistakes get "baked in" and corrupt the rest of the generation. BIGFix trains
+once committed. So early sampling mistakes get "baked in" and corrupt the rest of the generation. BIGFix trains
 the model to expect this by injecting random/self-sampled tokens into the visible context (`p_resample` /
 `bigfix/utils/masking_scheduler.py`), so it learns to fix errors it (or an earlier step) already committed instead of
 blindly trusting them. This preserves the speed of parallel decoding while closing much of the quality gap with
-slower, error-correcting samplers -- on top of it, the Halton Scheduler spreads which tokens get decoded at each
+slower, error-correcting samplers. On top of it, the Halton Scheduler spreads which tokens get decoded at each
 step uniformly across the image, further reducing sampling errors. The paper reports substantial gains from this
 combination on image generation with up to an order-of-magnitude inference speedup from
 multi-token parallel prediction.
@@ -211,10 +211,10 @@ Class-to-image models are on [Hugging Face](https://huggingface.co/llvictorll/Ha
 BIGFix text-to-image model is on [Hugging Face](https://huggingface.co/llvictorll/BigFIX/tree/main).
 Use them to jump straight into inference or fine-tuning.
 
-| Model                | # Params | # Input | # GFLOP | VQGAN |  MaskGIT                                                          | 
-|----------------------|----------|---------|---------|--------|-------------------------------------------------------------------|
-| Halton-MaskGIT-Large | 480M     | 24x24   | 83.00   | [🔗 Download](https://huggingface.co/FoundationVision/LlamaGen/blob/main/vq_ds16_c2i.pt)   |  [🔗 Download](https://huggingface.co/llvictorll/Halton-MaskGIT/blob/main/ImageNet_384_large.pth)  | 
-| BigFIX-XLarge (txt2img, 512x512) | -- | 32x32 | -- | [🔗 Download](https://huggingface.co/llvictorll/BigFIX/blob/main/vq_ds16_t2i.pt) | [🔗 Download](https://huggingface.co/llvictorll/BigFIX/blob/main/BigFix_XLarge_aplha02_res512_MiroFT.pth) |
+| Model                | # Params | # Input  | VQGAN |  MaskGIT                                                          | 
+|----------------------|----------|---------|--------|-------------------------------------------------------------------|
+| Halton-MaskGIT-Large | 480M     | 24x24   | [🔗 Download](https://huggingface.co/FoundationVision/LlamaGen/blob/main/vq_ds16_c2i.pt)   |  [🔗 Download](https://huggingface.co/llvictorll/Halton-MaskGIT/blob/main/ImageNet_384_large.pth)  | 
+| BigFIX-XLarge (txt2img, 512x512) | 627M | 32x32 | [🔗 Download](https://huggingface.co/llvictorll/BigFIX/blob/main/vq_ds16_t2i.pt) | [🔗 Download](https://huggingface.co/llvictorll/BigFIX/blob/main/BigFix_XLarge_aplha02_res512_MiroFT.pth) |
 
 ## ❤️ Contribute
 We welcome contributions and feedback! 🛠️
@@ -237,7 +237,7 @@ The pretrained VQGAN ImageNet (f=16/8, 16384 codebook) is from the [LlamaGen off
 ## 📖 Citation
 If you find our work useful, please cite us and add a star ⭐ to the repository :) 
 
-BIGFix -- the token-fixing / self-correction training recipe (ArXiv), the main paper this repository now implements:
+BIGFix: the token-fixing / self-correction training recipe (ArXiv), the main paper this repository now implements:
 ```
 @article{besnier2025bigfix,
   title={BIGFix: Bidirectional Image Generation with Token Fixing},
@@ -247,7 +247,7 @@ BIGFix -- the token-fixing / self-correction training recipe (ArXiv), the main p
 }
 ```
 
-The Halton Scheduling (ICLR2025) -- the decoding schedule used at inference time:
+The Halton Scheduling (ICLR2025): the decoding schedule used at inference time:
 ```
 @inproceedings{besnier2025iclr,
   title={Halton Scheduler for Masked Generative Image Transformer},
