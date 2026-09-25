@@ -77,6 +77,7 @@ if __name__ == "__main__":
     parser.add_argument("--compile",       action='store_true',              help="compile the network pytorch 2.0")
     parser.add_argument("--use-ema",       action='store_true',              help="use an ema or not")
     parser.add_argument("--skip-t5-init",  action='store_true',              help="skip T5 initialization")
+    parser.add_argument("--reset-iter",    action='store_true',              help="txt-to-img: with --resume, load the weights but restart the iteration counter at 0 (fine-tuning with a fresh warmup + cosine schedule)")
 
     # Model and Flop
     parser.add_argument("--vit-size",      type=str,   default="base",       help="size of the vit")

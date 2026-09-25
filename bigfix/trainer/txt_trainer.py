@@ -21,7 +21,7 @@ from bigfix.network.vq_model import VQ_models
 from bigfix.dataset.dataloader import get_data
 from bigfix.sampler.halton_sampler import TxtHaltonSampler as HaltonSampler
 from bigfix.utils.viz import reconstruction
-from bigfix.utils.masking_scheduler import get_mask_code
+from bigfix.utils.masking_scheduler import get_mask_code, build_codebook_knn, get_codebook_embedding
 from bigfix.utils.reward_utils import extract_reward_from_img_txt
 
 
@@ -82,6 +82,7 @@ class MaskGIT(Trainer):
             or getattr(self.args, "nb_class", 0) > 3
         )
         self.reward_drop_prob = float(getattr(self.args, "drop_reward", 0.5))
+        self._codebook_knn = None  # lazily built cache for resample_method="codebook_nn"
         self.reward_models_ready = False
         self.reward_init_attempted = False
         self.reward_models = {}
@@ -195,6 +196,34 @@ class MaskGIT(Trainer):
             return self._normalize_reward_shape(fallback_reward, images.size(0))
 
 
+    def get_resample_kwargs(self, code, txt_emb, reward):
+        """ Build the extra, method-specific kwargs forwarded to `inject_random_tok`
+        (see bigfix/utils/masking_scheduler.py) for the configured `self.args.resample_method`. """
+        method = self.args.resample_method
+
+        if method == "local_swap":
+            return {"swap_radius": self.args.swap_radius}
+
+        if method == "freq":
+            # Per-batch unigram estimate of codebook usage (+1 Laplace smoothing so every
+            # code has a nonzero chance of being drawn, even one absent from this batch).
+            freq = torch.bincount(code.reshape(-1), minlength=self.args.codebook_size).float() + 1
+            return {"codebook_freq": freq}
+
+        if method == "codebook_nn":
+            if self._codebook_knn is None:
+                embedding = get_codebook_embedding(self.ae)
+                self._codebook_knn = build_codebook_knn(embedding, k=self.args.knn_k)
+            return {"codebook_knn": self._codebook_knn}
+
+        if method == "self_sample":
+            # There is no EMA copy in the txt trainer, so sample from the model being trained (it is
+            # switched to eval() for the no-grad forward pass and restored afterwards). It sees the
+            # same (possibly CFG-dropped) text and reward conditioning as the training forward pass.
+            return {"model": self.vit, "model_kwargs": {"text_embs": txt_emb, "cond": reward}}
+
+        return {}  # "shuffle" needs no extra kwargs
+
     def get_network(self, archi):
         """ return the network, load checkpoint if self.args.resume == True
             :param
@@ -239,9 +268,13 @@ class MaskGIT(Trainer):
                     new_state_dict = {k.replace("module.", "").replace("_orig_mod.", ""): v for k, v in state_dict.items()}
                     model.load_state_dict(new_state_dict, strict=False)
 
-                    # Update the current epoch and iteration
-                    self.args.iter = checkpoint['iter']
-                    self.args.global_epoch = checkpoint['global_epoch']
+                    # Update the current epoch and iteration, unless fine-tuning: the warmup and cosine decay
+                    # of `adapt_learning_rate` are driven by `args.iter`, so a fresh schedule needs it at 0
+                    if getattr(self.args, "reset_iter", False):
+                        self.args.iter, self.args.global_epoch = 0, 0
+                    else:
+                        self.args.iter = checkpoint['iter']
+                        self.args.global_epoch = checkpoint['global_epoch']
                     del checkpoint, state_dict, new_state_dict  # release the mapping of the checkpoint file
 
                     if self.args.is_master:
@@ -318,7 +351,7 @@ class MaskGIT(Trainer):
                 with self.autocast:  # Perform forward pass using mixed precision (if available)
                     data["txt_emb"] = self.t5_model(**t5_input).last_hidden_state
 
-            elif self.args.data in ["imagenet_txt", "synthetics", "gpic+fine_t2i", "gcip", "gpic+fine_t2i", "gpic+fine_t2i+rendered_text"]:
+            elif self.args.data in ["imagenet_txt", "synthetics", "gpic+fine_t2i", "gcip", "gpic+fine_t2i", "gpic+fine_t2i+rendered_text", "fine_t2i"]:
 
                 # VQGAN encoding img to tokens
                 _, _, [_, _, code] = self.ae.encode(data["img"].to(self.args.device))
@@ -358,9 +391,15 @@ class MaskGIT(Trainer):
             reward_d = reward.masked_fill(drop_reward, -1)
 
             # Apply masking to encoded codes
-            masked_code, mask, loss_ign = get_mask_code(
-                code, value=self.args.mask_value, codebook_size=self.args.codebook_size,
-                mode=self.args.sched_mode, p_resample=0.2)
+            p_resample = getattr(self.args, "p_resample", 0.0)
+            resample_kwargs = self.get_resample_kwargs(code, txt_emb_d, reward_d) if p_resample > 0 else None
+            with self.autocast:  # the "self_sample" method runs a forward pass of the transformer
+                masked_code, mask, loss_ign = get_mask_code(
+                    code, value=self.args.mask_value, codebook_size=self.args.codebook_size,
+                    mode=self.args.sched_mode, p_resample=p_resample,
+                    resample_method=getattr(self.args, "resample_method", "shuffle"),
+                    resample_p_schedule=getattr(self.args, "resample_p_schedule", False),
+                    resample_kwargs=resample_kwargs)
 
             # Create target code, replacing ignored tokens with -100
             target_code = torch.where(loss_ign, code.detach().clone(), -100)
