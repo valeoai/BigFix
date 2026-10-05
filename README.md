@@ -46,8 +46,6 @@ Halton sampling schedule at inference time.
 
 Explore, train, and extend our easy to use generative models! 🚀
 
-The v1.0 version, previously known as "MaskGIT-pytorch" is available [here!](https://github.com/valeoai/BigFix/releases/tag/v1.0)
-
 ---
 
 ## 📁 Repository Structure
